@@ -28,11 +28,24 @@ SimpleEQAudioProcessorEditor::SimpleEQAudioProcessorEditor (SimpleEQAudioProcess
         addAndMakeVisible(comp);
     }
     
+    const auto& params = audioProcessor.getParameters();
+    for (auto param : params)
+    {
+        param->addListener(this);
+    }
+
+    startTimerHz(60);
+
     setSize (600, 400);
 }
 
 SimpleEQAudioProcessorEditor::~SimpleEQAudioProcessorEditor()
 {
+    const auto& params = audioProcessor.getParameters();
+    for (auto param : params)
+    {
+        param->removeListener(this);
+    }
 }
 
 //==============================================================================
@@ -135,6 +148,31 @@ void SimpleEQAudioProcessorEditor::resized()
     peakFreqSlider.setBounds(bounds.removeFromTop(bounds.getHeight() * 0.33));
     peakGainSlider.setBounds(bounds.removeFromTop(bounds.getHeight() * 0.5));
     peakQualitySlider.setBounds(bounds);
+}
+
+void SimpleEQAudioProcessorEditor::parameterValueChanged(int parameterIndex, float newValue)
+{
+    parametersChanged.set(true);
+}
+
+void SimpleEQAudioProcessorEditor::timerCallback()
+{
+    if (parametersChanged.compareAndSetBool(false, true))
+    {
+        auto ChainSettings = getChainSettings(audioProcessor.apvts);
+        auto sampleRate = audioProcessor.getSampleRate();
+
+        auto peakCoefficients = makePeakFilter(ChainSettings, sampleRate);
+        updateCoefficients(monoChain.get<ChainPositions::Peak>().coefficients, peakCoefficients);
+
+        auto lowCutCoefficient = makeLowCutFilter(ChainSettings, sampleRate);
+        auto highCutCoefficients = makeHighCutFilter(ChainSettings, sampleRate);
+
+        updateCutFilterChain(monoChain.get<ChainPositions::LowCut>(), lowCutCoefficient, ChainSettings.lowCutSlope);
+        updateCutFilterChain(monoChain.get<ChainPositions::HighCut>(), highCutCoefficients, ChainSettings.highCutSlope);
+
+        repaint();
+    }
 }
 
 std::vector<juce::Component*> SimpleEQAudioProcessorEditor::getComps()
