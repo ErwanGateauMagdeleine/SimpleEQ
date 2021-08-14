@@ -44,6 +44,61 @@ using Coefficients = Filter::CoefficientsPtr;
 void updateCoefficients(Coefficients& old, const Coefficients& replacements);
 
 Coefficients makePeakFilter(const ChainSettings& chainSettings, double SampleRate);
+
+template<int Index, typename ChainType, typename CoefficientType>
+void updateCutFilter(ChainType& chain,
+    const CoefficientType& coefficients)
+{
+    updateCoefficients(chain.template get<Index>().coefficients, *coefficients[Index]);
+    chain.template setBypassed<Index>(false);
+}
+
+template<typename ChainType, typename CoefficientType>
+void updateCutFilterChain(ChainType& lowCutChain,
+    const CoefficientType& cutCoefficients,
+    const Slope lowCutSlope)
+{
+    lowCutChain.template setBypassed<0>(true);
+    lowCutChain.template setBypassed<1>(true);
+    lowCutChain.template setBypassed<2>(true);
+    lowCutChain.template setBypassed<3>(true);
+
+    switch (lowCutSlope)
+    {
+        case Slope_48:
+        {
+            updateCutFilter<3>(lowCutChain, cutCoefficients);
+        }
+        case Slope_36:
+        {
+            updateCutFilter<2>(lowCutChain, cutCoefficients);
+        }
+        case Slope_24:
+        {
+            updateCutFilter<1>(lowCutChain, cutCoefficients);
+        }
+        case Slope_12:
+        {
+            updateCutFilter<0>(lowCutChain, cutCoefficients);
+        }
+    }
+}
+
+inline auto makeLowCutFilter(const ChainSettings& chainSettings, double sampleRate)
+{
+    return juce::dsp::FilterDesign<float>::designIIRHighpassHighOrderButterworthMethod(chainSettings.lowCutFreq,
+                                                                                       sampleRate,
+                                                                                       2 * (chainSettings.lowCutSlope + 1)
+                                                                                      );
+}
+
+inline auto makeHighCutFilter(const ChainSettings& chainSettings, double sampleRate)
+{
+    return juce::dsp::FilterDesign<float>::designIIRLowpassHighOrderButterworthMethod(chainSettings.highCutFreq,
+                                                                                      sampleRate,
+                                                                                      2 * (chainSettings.highCutSlope + 1)
+                                                                                     );
+}
 //==============================================================================
 /**
 */
@@ -96,44 +151,6 @@ private:
 
     void updatePeakFilter(const ChainSettings& chainSettings);
 
-    template<int Index, typename ChainType, typename CoefficientType>
-    void updateCutFilter(ChainType& chain,
-                                     const CoefficientType& coefficients)
-    {
-        updateCoefficients(chain.template get<Index>().coefficients, *coefficients[Index]);
-        chain.template setBypassed<Index>(false);
-    }
-
-    template<typename ChainType, typename CoefficientType>
-    void updateLowCutFilter(ChainType& lowCutChain,
-                            const CoefficientType& cutCoefficients,
-                            const Slope lowCutSlope)
-    {
-        lowCutChain.template setBypassed<0>(true);
-        lowCutChain.template setBypassed<1>(true);
-        lowCutChain.template setBypassed<2>(true);
-        lowCutChain.template setBypassed<3>(true);
-
-        switch (lowCutSlope)
-        {
-            case Slope_48:
-            {
-                updateCutFilter<3>(lowCutChain, cutCoefficients);
-            }
-            case Slope_36:
-            {
-                updateCutFilter<2>(lowCutChain, cutCoefficients);
-            }
-            case Slope_24:
-            {
-                updateCutFilter<1>(lowCutChain, cutCoefficients);
-            }
-            case Slope_12:
-            {
-                updateCutFilter<0>(lowCutChain, cutCoefficients);
-            }
-        }
-    }
     void updateLowCutFilters(const ChainSettings& chainSettings);
     void updateHighCutFilters(const ChainSettings& chainSettings);
 
