@@ -174,7 +174,7 @@ struct LookAndFeel : juce::LookAndFeel_V4
                           float sliderPosProportional,
                           float rotaryStartAngle,
                           float rotaryEndAngle,
-                          juce::Slider&);
+                          juce::Slider&) override;
 };
 
 struct RotarySliderWithLabels : juce::Slider
@@ -302,6 +302,17 @@ private:
                highCutFreqSliderAttachement,
                lowCutSlopeSliderAttachement,
                highCutSlopeSliderAttachement;
+
+    juce::ToggleButton lowCutBypassButton,
+                       peakBypassButton,
+                       highCutBypassButton,
+                       analyzerEnableButton;
+    
+    using ButtonAttachement = APVTS::ButtonAttachment;
+    ButtonAttachement lowCutBypassButtonAttachment,
+                      peakBypassButtonAttachement,
+                      highCutBypassButtonAttachment,
+                      analyzerEnableButtonAttachment;
 
     std::vector<juce::Component*> getComps();
 
