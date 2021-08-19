@@ -102,22 +102,7 @@ void LookAndFeel::drawToggleButton(juce::Graphics& g,
 
         g.setColour(color);
 
-        auto bounds = toggleButton.getLocalBounds();
-
-        auto insetRect = bounds.reduced(4);
-
-        Path randomPath;
-
-        Random r;
-
-        randomPath.startNewSubPath(insetRect.getX(), insetRect.getY() + insetRect.getHeight() * r.nextFloat());
-
-        for (auto x = insetRect.getX() + 1; x < insetRect.getRight(); x += 2)
-        {
-            randomPath.lineTo(x, insetRect.getY() + insetRect.getHeight() * r.nextFloat());
-        }
-
-        g.strokePath(randomPath, PathStrokeType(1.f));
+        g.strokePath(ab->randomPath, PathStrokeType(1.f));
 
     }
 }
