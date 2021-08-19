@@ -274,7 +274,13 @@ void ResponseCurveComponent::paint(juce::Graphics& g)
         responseCurve.lineTo(responseArea.getX() + i, map(mags[i]));
     }
 
-    g.setColour(Colours::blue);
+    leftChannelFFTPath.applyTransform(AffineTransform().translation(responseArea.getX(), responseArea.getY()));
+
+    auto xFactor = responseArea.getWidth() / leftChannelFFTPath.getLength();
+    leftChannelFFTPath.applyTransform(AffineTransform().scaled(xFactor, 1));
+
+
+    g.setColour(Colours::lightblue);
     g.strokePath(leftChannelFFTPath, PathStrokeType(1.f));
     
     g.setColour(Colours::orange);
