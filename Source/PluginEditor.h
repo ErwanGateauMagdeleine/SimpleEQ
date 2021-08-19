@@ -182,6 +182,7 @@ struct LookAndFeel : juce::LookAndFeel_V4
                           bool shouldDrawButtonAsDown) override;
 };
 
+//==============================================================================
 struct RotarySliderWithLabels : juce::Slider
 {
     RotarySliderWithLabels(juce::RangedAudioParameter& rap, const juce::String unitSuffix) : 
@@ -270,6 +271,10 @@ private:
     PathProducer leftPathProducer, rightPathProducer;
 };
 //==============================================================================
+struct powerButton : juce::ToggleButton {};
+
+struct analyzerButton : juce::ToggleButton {};
+//==============================================================================
 /**
 */
 class SimpleEQAudioProcessorEditor  : public juce::AudioProcessorEditor
@@ -308,10 +313,11 @@ private:
                lowCutSlopeSliderAttachement,
                highCutSlopeSliderAttachement;
 
-    juce::ToggleButton lowCutBypassButton,
-                       peakBypassButton,
-                       highCutBypassButton,
-                       analyzerEnableButton;
+    powerButton lowCutBypassButton,
+                peakBypassButton,
+                highCutBypassButton;
+    
+    analyzerButton analyzerEnableButton;
     
     using ButtonAttachement = APVTS::ButtonAttachment;
     ButtonAttachement lowCutBypassButtonAttachment,
