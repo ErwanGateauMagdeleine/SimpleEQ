@@ -177,16 +177,14 @@ juce::String RotarySliderWithLabels::getDisplayString() const
 
 //==============================================================================
 ResponseCurveComponent::ResponseCurveComponent(SimpleEQAudioProcessor& p) : audioProcessor(p),
-leftChannelFifo(&audioProcessor.leftChannelFifo)
+leftPathProducer(audioProcessor.leftChannelFifo),
+rightPathProducer(audioProcessor.rightChannelFifo)
 {
     const auto& params = audioProcessor.getParameters();
     for (auto param : params)
     {
         param->addListener(this);
     }
-
-    leftChannelFFTDataGenerator.changeOrder(FFTOrder::order2048);
-    monoBuffer.setSize(1, leftChannelFFTDataGenerator.getFFTSize());
 
     updateChain();
 
@@ -274,14 +272,17 @@ void ResponseCurveComponent::paint(juce::Graphics& g)
         responseCurve.lineTo(responseArea.getX() + i, map(mags[i]));
     }
 
+    auto leftChannelFFTPath = leftPathProducer.getPath();
     leftChannelFFTPath.applyTransform(AffineTransform().translation(responseArea.getX(), responseArea.getY()));
-
-    auto xFactor = responseArea.getWidth() / leftChannelFFTPath.getLength();
-    leftChannelFFTPath.applyTransform(AffineTransform().scaled(xFactor, 1));
-
-
+    
     g.setColour(Colours::lightblue);
     g.strokePath(leftChannelFFTPath, PathStrokeType(1.f));
+
+    auto rightChannelFFTPath = rightPathProducer.getPath();
+    rightChannelFFTPath.applyTransform(AffineTransform().translation(responseArea.getX(), responseArea.getY()));
+
+    g.setColour(Colours::yellow);
+    g.strokePath(rightChannelFFTPath, PathStrokeType(1.f));
     
     g.setColour(Colours::orange);
     g.drawRoundedRectangle(getRenderArea().toFloat(), 4.f, 1.f);
@@ -425,31 +426,30 @@ void ResponseCurveComponent::updateChain()
     updateCutFilterChain(monoChain.get<ChainPositions::HighCut>(), highCutCoefficients, ChainSettings.highCutSlope);
 }
 
-void ResponseCurveComponent::timerCallback()
+void PathProducer::process(juce::Rectangle<float> fftBounds, double sampleRate)
 {
-   juce::AudioBuffer<float> tempIncomingBuffer;
+    juce::AudioBuffer<float> tempIncomingBuffer;
 
-   while (leftChannelFifo->genNumCompleteBuffersAvailable() > 0)
+    while (leftChannelFifo->genNumCompleteBuffersAvailable() > 0)
     {
         if (leftChannelFifo->getAudioBuffer(tempIncomingBuffer))
         {
             auto size = tempIncomingBuffer.getNumSamples();
-            juce::FloatVectorOperations::copy(monoBuffer.getWritePointer(0, 0), 
-                                              monoBuffer.getReadPointer(0, size),
-                                              monoBuffer.getNumSamples() - size);
+            juce::FloatVectorOperations::copy(monoBuffer.getWritePointer(0, 0),
+                monoBuffer.getReadPointer(0, size),
+                monoBuffer.getNumSamples() - size);
 
             juce::FloatVectorOperations::copy(monoBuffer.getWritePointer(0, monoBuffer.getNumSamples() - size),
-                                              tempIncomingBuffer.getReadPointer(0, 0),
-                                              size
-                                             );
-            
+                tempIncomingBuffer.getReadPointer(0, 0),
+                size
+            );
+
             leftChannelFFTDataGenerator.produceFFTDataForRendering(monoBuffer, -48.f);
         }
     }
 
-    auto fftBounds = getAnalysisArea().toFloat();
     auto fftSize = leftChannelFFTDataGenerator.getFFTSize();
-    const auto binWidth = audioProcessor.getSampleRate() / (double)fftSize;
+    const auto binWidth = sampleRate / (double)fftSize;
 
     while (leftChannelFFTDataGenerator.getNumAvailableFFTDataBlocks() > 0)
     {
@@ -464,11 +464,21 @@ void ResponseCurveComponent::timerCallback()
     {
         pathProducer.getPath(leftChannelFFTPath);
     }
+}
+
+void ResponseCurveComponent::timerCallback()
+{
+   
+    auto fftBounds = getAnalysisArea().toFloat();
+    auto sampleRate = audioProcessor.getSampleRate();
+
+    leftPathProducer.process(fftBounds, sampleRate);
+    rightPathProducer.process(fftBounds, sampleRate);
+    
 
     if (parametersChanged.compareAndSetBool(false, true))
     {
         updateChain();
-
     }
 
     repaint();
