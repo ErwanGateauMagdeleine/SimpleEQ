@@ -253,6 +253,8 @@ struct ResponseCurveComponent : juce::Component,
     void paint(juce::Graphics& g) override;
 
     void resized() override;
+
+    void toggleAnalysisEnablement(bool enabled);
 private:
     SimpleEQAudioProcessor& audioProcessor;
 
@@ -269,6 +271,8 @@ private:
     juce::Rectangle<int> getAnalysisArea();
 
     PathProducer leftPathProducer, rightPathProducer;
+
+    bool shouldShowFFTAnalysis = true;
 };
 //==============================================================================
 struct powerButton : juce::ToggleButton {};

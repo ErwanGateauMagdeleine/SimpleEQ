@@ -316,18 +316,21 @@ void ResponseCurveComponent::paint(juce::Graphics& g)
         responseCurve.lineTo(responseArea.getX() + i, map(mags[i]));
     }
 
-    auto leftChannelFFTPath = leftPathProducer.getPath();
-    leftChannelFFTPath.applyTransform(AffineTransform().translation(responseArea.getX(), responseArea.getY()));
-    
-    g.setColour(Colours::lightblue);
-    g.strokePath(leftChannelFFTPath, PathStrokeType(1.f));
+    if (shouldShowFFTAnalysis)
+    {
+        auto leftChannelFFTPath = leftPathProducer.getPath();
+        leftChannelFFTPath.applyTransform(AffineTransform().translation(responseArea.getX(), responseArea.getY()));
 
-    auto rightChannelFFTPath = rightPathProducer.getPath();
-    rightChannelFFTPath.applyTransform(AffineTransform().translation(responseArea.getX(), responseArea.getY()));
+        g.setColour(Colours::lightblue);
+        g.strokePath(leftChannelFFTPath, PathStrokeType(1.f));
 
-    g.setColour(Colours::yellow);
-    g.strokePath(rightChannelFFTPath, PathStrokeType(1.f));
-    
+        auto rightChannelFFTPath = rightPathProducer.getPath();
+        rightChannelFFTPath.applyTransform(AffineTransform().translation(responseArea.getX(), responseArea.getY()));
+
+        g.setColour(Colours::yellow);
+        g.strokePath(rightChannelFFTPath, PathStrokeType(1.f));
+    }
+
     g.setColour(Colours::orange);
     g.drawRoundedRectangle(getRenderArea().toFloat(), 4.f, 1.f);
 
@@ -474,6 +477,52 @@ void ResponseCurveComponent::updateChain()
     updateCutFilterChain(monoChain.get<ChainPositions::HighCut>(), highCutCoefficients, ChainSettings.highCutSlope);
 }
 
+void ResponseCurveComponent::toggleAnalysisEnablement(bool enabled)
+{
+    shouldShowFFTAnalysis = enabled;
+}
+
+void ResponseCurveComponent::timerCallback()
+{
+   
+    if (shouldShowFFTAnalysis)
+    {
+        auto fftBounds = getAnalysisArea().toFloat();
+        auto sampleRate = audioProcessor.getSampleRate();
+
+        leftPathProducer.process(fftBounds, sampleRate);
+        rightPathProducer.process(fftBounds, sampleRate);
+    }
+
+    if (parametersChanged.compareAndSetBool(false, true))
+    {
+        updateChain();
+    }
+
+    repaint();
+}
+
+juce::Rectangle<int> ResponseCurveComponent::getRenderArea()
+{
+    auto bounds = getLocalBounds();
+
+    bounds.removeFromTop(12);
+    bounds.removeFromBottom(2);
+    bounds.removeFromLeft(20);
+    bounds.removeFromRight(20);
+
+    return bounds;
+}
+
+juce::Rectangle<int> ResponseCurveComponent::getAnalysisArea()
+{
+    auto bounds = getRenderArea();
+    bounds.removeFromTop(4);
+    bounds.removeFromBottom(4);
+    return bounds;
+}
+
+//==============================================================================
 void PathProducer::process(juce::Rectangle<float> fftBounds, double sampleRate)
 {
     juce::AudioBuffer<float> tempIncomingBuffer;
@@ -514,43 +563,6 @@ void PathProducer::process(juce::Rectangle<float> fftBounds, double sampleRate)
     }
 }
 
-void ResponseCurveComponent::timerCallback()
-{
-   
-    auto fftBounds = getAnalysisArea().toFloat();
-    auto sampleRate = audioProcessor.getSampleRate();
-
-    leftPathProducer.process(fftBounds, sampleRate);
-    rightPathProducer.process(fftBounds, sampleRate);
-    
-
-    if (parametersChanged.compareAndSetBool(false, true))
-    {
-        updateChain();
-    }
-
-    repaint();
-}
-
-juce::Rectangle<int> ResponseCurveComponent::getRenderArea()
-{
-    auto bounds = getLocalBounds();
-
-    bounds.removeFromTop(12);
-    bounds.removeFromBottom(2);
-    bounds.removeFromLeft(20);
-    bounds.removeFromRight(20);
-
-    return bounds;
-}
-
-juce::Rectangle<int> ResponseCurveComponent::getAnalysisArea()
-{
-    auto bounds = getRenderArea();
-    bounds.removeFromTop(4);
-    bounds.removeFromBottom(4);
-    return bounds;
-}
 //==============================================================================
 SimpleEQAudioProcessorEditor::SimpleEQAudioProcessorEditor (SimpleEQAudioProcessor& p)
     : AudioProcessorEditor (&p), audioProcessor (p),
@@ -642,6 +654,16 @@ SimpleEQAudioProcessorEditor::SimpleEQAudioProcessorEditor (SimpleEQAudioProcess
             comp->highCutFreqSlider.setEnabled(!bypassed);
             comp->highCutSlopeSlider.setEnabled(!bypassed);
 
+        }
+    };
+    
+    analyzerEnableButton.onClick = [safePtr]()
+    {
+        if (auto* comp = safePtr.getComponent())
+        {
+            auto enabled = comp->analyzerEnableButton.getToggleState();
+
+            comp->responseCurveComponent.toggleAnalysisEnablement(enabled);
         }
     };
 
